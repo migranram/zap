@@ -26,7 +26,7 @@ const Argument = union(enum) {
         if (zlip.isFloat(T)) return Argument{ .Float = FloatArg{ .name = name, .value = if (value) |v| @floatCast(v) else undefined } };
         if (T == bool) return Argument{ .Bool = BoolArg{ .name = name, .value = value orelse undefined } };
         if (T == []const u8) return Argument{ .String = StringArg{ .name = name, .value = value orelse undefined } };
-        return ParserError.CouldNotBeParsed;
+        return ParserError.InvalidRawType;
     }
 };
 
@@ -64,10 +64,10 @@ const ArgumentParser = struct {
 
         for (self.arguments.items, 0..) |arg, j| {
             switch (arg) {
-                .Bool => std.debug.print("({d})[Bool ] {s:<20}: {s}\n", .{ j, arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
-                .Int => std.debug.print("({d})[Int  ] {s:<20}: {d}\n", .{ j, arg.Int.name, arg.Int.value }),
-                .Float => std.debug.print("({d})[Float] {s:<20}: {d}\n", .{ j, arg.Float.name, arg.Float.value }),
-                else => std.debug.print("({d}){}\n", .{ j, arg }),
+                .Bool => std.debug.print("({d})[{s:-^14}] {s:<20}: {s}\n", .{ j, "Bool", arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
+                .Int => std.debug.print("({d})[{s:-^14}] {s:<20}: {d}\n", .{ j, "Int", arg.Int.name, arg.Int.value }),
+                .Float => std.debug.print("({d})[{s:-^14}] {s:<20}: {d}\n", .{ j, "Float", arg.Float.name, arg.Float.value }),
+                .String => std.debug.print("({d})[{s:-^14}] {s:<20}: {s}\n", .{ j, "String", arg.String.name, arg.String.value }),
             }
         }
     }
@@ -84,8 +84,8 @@ pub fn main() !void {
     var parser: ArgumentParser = try ArgumentParser.init(allocator, "parser");
     defer parser.deinit();
     _ = parser.addArgument("test", bool, null);
-    _ = parser.addArgument("withDefault", i32, 125);
-    _ = parser.addArgument("withDefault2", f64, 125.23);
+    _ = parser.addArgument("integer", i32, 125);
+    _ = parser.addArgument("float", f64, 125.23);
     _ = parser.addArgument("string", []const u8, "hello arg");
     parser.parseFromArgIterator(&arg_iterator);
 }

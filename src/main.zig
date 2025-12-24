@@ -30,14 +30,21 @@ const Argument = union(enum) {
     }
 };
 
+const ArgumentOptions = struct {
+    role: enum { Positional, Flag, Optional },
+};
+
+/// _deinit()_ available
 const ArgumentParser = struct {
     name: []const u8,
     arguments: std.ArrayList(Argument),
+    arguments_options: std.ArrayList(?ArgumentOptions),
     allocator: std.mem.Allocator,
 
     fn init(allocator: std.mem.Allocator, name: []const u8) !ArgumentParser {
         return ArgumentParser{
-            .arguments = try std.ArrayList(Argument).initCapacity(allocator, 100),
+            .arguments = try std.ArrayList(Argument).initCapacity(allocator, 10),
+            .arguments_options = .empty,
             .name = name,
             .allocator = allocator,
         };
@@ -45,11 +52,14 @@ const ArgumentParser = struct {
 
     fn deinit(self: *ArgumentParser) void {
         self.arguments.deinit(self.allocator);
+        self.arguments_options.deinit(self.allocator);
     }
 
-    fn addArgument(self: *ArgumentParser, name: []const u8, T: type, defaultValue: ?T) bool {
+    fn addArgument(self: *ArgumentParser, name: []const u8, T: type, defaultValue: ?T, options: ?ArgumentOptions) bool {
         const arg = Argument.createFromType(name, T, defaultValue) catch return false;
         self.arguments.append(self.allocator, arg) catch return false;
+
+        self.arguments_options.append(self.allocator, options) catch return false;
 
         return true;
     }
@@ -83,9 +93,9 @@ pub fn main() !void {
 
     var parser: ArgumentParser = try ArgumentParser.init(allocator, "parser");
     defer parser.deinit();
-    _ = parser.addArgument("test", bool, null);
-    _ = parser.addArgument("integer", i32, 125);
-    _ = parser.addArgument("float", f64, 125.23);
-    _ = parser.addArgument("string", []const u8, "hello arg");
+    _ = parser.addArgument("test", bool, null, null);
+    _ = parser.addArgument("integer", i32, 125, null);
+    _ = parser.addArgument("float", f64, 125.23, null);
+    _ = parser.addArgument("string", []const u8, "hello arg", null);
     parser.parseFromArgIterator(&arg_iterator);
 }

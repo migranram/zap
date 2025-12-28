@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const zlip = @import("zlip");
+const zap = @import("zap");
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -11,12 +11,13 @@ pub fn main() !void {
     defer arg_iterator.deinit();
     _ = arg_iterator.next();
 
-    var parser: zlip.ArgumentParser = try zlip.ArgumentParser.init(allocator, "parser");
+    var parser: zap.ArgumentParser = try zap.ArgumentParser.init(allocator, "my test parser");
     defer parser.deinit();
+
     _ = parser.addArgument("integer", i32, 125, null);
-    _ = parser.addArgument("test", bool, null, zlip.ArgumentOptions{ .role = .Flag });
-    _ = parser.addArgument("float", f64, 125.23, zlip.ArgumentOptions{ .role = .Optional });
-    _ = parser.addArgument("string", []const u8, "hello arg", zlip.ArgumentOptions{ .role = .Optional });
+    _ = parser.addArgument("test", bool, null, zap.ArgumentOptions{ .role = .Flag });
+    _ = parser.addArgument("float", f64, 125.23, zap.ArgumentOptions{ .role = .Optional });
+    _ = parser.addArgument("string", []const u8, "hello arg", zap.ArgumentOptions{ .role = .Optional });
 
     std.debug.print("Arguments before parsing\n", .{});
     parser.printInfo();

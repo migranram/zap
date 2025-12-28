@@ -52,7 +52,7 @@ pub const ArgumentParser = struct {
     }
 
     pub fn printInfo(self: *ArgumentParser) void {
-        std.debug.print("{s:-^30}\n", .{"CONFIG. ARGS"});
+        std.debug.print("{s:-^30}\n", .{self.name});
         var j: usize = 0;
         for (self.positional_arguments.items) |arg| {
             switch (arg) {

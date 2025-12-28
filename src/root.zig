@@ -121,6 +121,7 @@ pub const ArgumentParser = struct {
         }
     }
 
+    /// Throws an **zlap.Error.ParsingError** if something goes wrong while parsing!
     pub fn parse(self: *ArgumentParser) !void {
         var arg_iterator = try std.process.argsWithAllocator(self.allocator);
         defer arg_iterator.deinit();

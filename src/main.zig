@@ -19,7 +19,10 @@ pub fn main() !void {
     std.debug.print("Arguments before parsing\n", .{});
     parser.printInfo();
 
-    parser.parse() catch std.debug.print("Error parsing arguments!\n", .{});
+    parser.parse() catch {
+        std.debug.print(">>> Error parsing arguments!\n", .{});
+        return;
+    };
 
     std.debug.print("\n\nArguments after parsing\n", .{});
     parser.printInfo();

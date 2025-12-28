@@ -80,7 +80,7 @@ pub const Argument = union(enum) {
         return ParsingResult.NotParsed;
     }
 
-    fn parseOptional(self: *Argument, text: []const u8, iterator: *std.process.ArgIterator) errors.ParserError!ParsingResult {
+    fn parseOptional(self: *Argument, text: []const u8) errors.ParserError!ParsingResult {
         if (text.len < 3)
             return ParsingResult.NotParsed;
 
@@ -88,12 +88,6 @@ pub const Argument = union(enum) {
         if (!std.mem.eql(u8, text[2..], fmt_name)) {
             return ParsingResult.NotParsed;
         }
-
-        const next_token = iterator.next();
-
-        if (next_token) |token| {
-            try self.parseValueFromString(token);
-        } else return errors.ParserError.CouldNotBeParsed;
 
         return ParsingResult.Parsed;
     }
@@ -124,14 +118,14 @@ pub const Argument = union(enum) {
         }
     }
 
-    pub fn parseString(self: *Argument, text: []const u8, role: ArgumentRole, arg_iterator: *std.process.ArgIterator) errors.ParserError!ParsingResult {
+    pub fn parseString(self: *Argument, text: []const u8, role: ArgumentRole) errors.ParserError!ParsingResult {
         if (self.parsed())
             return ParsingResult.AlreadyParsed;
 
         const ret = switch (role) {
             .Positional => self.parsePositional(text),
             .Flag => self.parseFlag(text),
-            .Optional => self.parseOptional(text, arg_iterator),
+            .Optional => self.parseOptional(text),
         } catch |err| return err;
 
         if (ret == ParsingResult.Parsed)

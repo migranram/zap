@@ -11,7 +11,6 @@ pub const Errors = @import("errors.zig");
 /// _deinit()_ available
 pub const ArgumentParser = struct {
     name: []const u8,
-    arguments_options: std.ArrayList(?ArgumentOptions),
     allocator: std.mem.Allocator,
 
     // Arguments
@@ -24,7 +23,6 @@ pub const ArgumentParser = struct {
             .flag_arguments = try std.ArrayList(Argument).initCapacity(allocator, 10),
             .positional_arguments = try std.ArrayList(Argument).initCapacity(allocator, 10),
             .optional_arguments = try std.ArrayList(Argument).initCapacity(allocator, 10),
-            .arguments_options = .empty,
             .name = name,
             .allocator = allocator,
         };
@@ -34,7 +32,6 @@ pub const ArgumentParser = struct {
         self.flag_arguments.deinit(self.allocator);
         self.positional_arguments.deinit(self.allocator);
         self.optional_arguments.deinit(self.allocator);
-        self.arguments_options.deinit(self.allocator);
     }
 
     pub fn addArgument(self: *ArgumentParser, name: []const u8, T: type, defaultValue: ?T, options: ?ArgumentOptions) bool {
@@ -51,28 +48,40 @@ pub const ArgumentParser = struct {
             ArgumentRole.Optional => self.optional_arguments.append(self.allocator, arg) catch return false,
         }
 
-        self.arguments_options.append(self.allocator, options) catch return false;
-
         return true;
     }
 
     pub fn printInfo(self: *ArgumentParser) void {
         std.debug.print("{s:-^30}\n", .{"CONFIG. ARGS"});
-
-        for ([_]std.ArrayList(Argument){ self.flag_arguments, self.positional_arguments, self.optional_arguments }) |arguments| {
-            for (arguments.items, 0..) |arg, j| {
-                switch (arg) {
-                    .Bool => std.debug.print("({d})[{s:-^14}] {s:<20}: {s}\n", .{ j, "Bool", arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
-                    .Int => std.debug.print("({d})[{s:-^14}] {s:<20}: {d}\n", .{ j, "Int", arg.Int.name, arg.Int.value }),
-                    .Float => std.debug.print("({d})[{s:-^14}] {s:<20}: {d}\n", .{ j, "Float", arg.Float.name, arg.Float.value }),
-                    .String => std.debug.print("({d})[{s:-^14}] {s:<20}: {s}\n", .{ j, "String", arg.String.name, arg.String.value }),
-                }
+        var j: usize = 0;
+        for (self.positional_arguments.items) |arg| {
+            switch (arg) {
+                .Bool => std.debug.print("({d})|.POS|[{s:.^14}] {s:<20}: {s}\n", .{ j, "Bool", arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
+                .Int => std.debug.print("({d})|.POS|[{s:.^14}] {s:<20}: {d}\n", .{ j, "Int", arg.Int.name, arg.Int.value }),
+                .Float => std.debug.print("({d})|.POS|[{s:.^14}] {s:<20}: {d}\n", .{ j, "Float", arg.Float.name, arg.Float.value }),
+                .String => std.debug.print("({d})|.POS|[{s:.^14}] {s:<20}: {s}\n", .{ j, "String", arg.String.name, arg.String.value }),
             }
+            j += 1;
+        }
+        for (self.flag_arguments.items) |arg| {
+            switch (arg) {
+                .Bool => std.debug.print("({d})|FLAG|[{s:.^14}] {s:<20}: {s}\n", .{ j, "Bool", arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
+                else => @panic("Flag should only be bool"),
+            }
+            j += 1;
+        }
+        for (self.optional_arguments.items) |arg| {
+            switch (arg) {
+                .Bool => std.debug.print("({d})|.OPT|[{s:.^14}] {s:<20}: {s}\n", .{ j, "Bool", arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
+                .Int => std.debug.print("({d})|.OPT|[{s:.^14}] {s:<20}: {d}\n", .{ j, "Int", arg.Int.name, arg.Int.value }),
+                .Float => std.debug.print("({d})|.OPT|[{s:.^14}] {s:<20}: {d}\n", .{ j, "Float", arg.Float.name, arg.Float.value }),
+                .String => std.debug.print("({d})|.OPT|[{s:.^14}] {s:<20}: {s}\n", .{ j, "String", arg.String.name, arg.String.value }),
+            }
+            j += 1;
         }
     }
 
     pub fn parseFromArgIterator(self: *ArgumentParser, arg_iterator: *std.process.ArgIterator) Errors.ParserError!void {
-        self.printInfo();
         // First parse the positionals, they have to be in the same order as defined:
         var ix: usize = 0;
         outerloop: while (arg_iterator.next()) |token| : (ix += 1) {

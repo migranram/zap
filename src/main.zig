@@ -17,7 +17,12 @@ pub fn main() !void {
     _ = parser.addArgument("test", bool, null, zlip.ArgumentOptions{ .role = .Flag });
     _ = parser.addArgument("float", f64, 125.23, zlip.ArgumentOptions{ .role = .Optional });
     _ = parser.addArgument("string", []const u8, "hello arg", zlip.ArgumentOptions{ .role = .Optional });
+
+    std.debug.print("Arguments before parsing\n", .{});
+    parser.printInfo();
+
     parser.parseFromArgIterator(&arg_iterator) catch std.debug.print("Error parsing arguments!\n", .{});
 
+    std.debug.print("\n\nArguments after parsing\n", .{});
     parser.printInfo();
 }

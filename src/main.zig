@@ -7,9 +7,6 @@ pub fn main() !void {
     defer arena.deinit();
 
     const allocator = arena.allocator();
-    var arg_iterator = try std.process.argsWithAllocator(allocator);
-    defer arg_iterator.deinit();
-    _ = arg_iterator.next();
 
     var parser: zap.ArgumentParser = try zap.ArgumentParser.init(allocator, "my test parser");
     defer parser.deinit();
@@ -22,7 +19,7 @@ pub fn main() !void {
     std.debug.print("Arguments before parsing\n", .{});
     parser.printInfo();
 
-    parser.parseFromArgIterator(&arg_iterator) catch std.debug.print("Error parsing arguments!\n", .{});
+    parser.parse() catch std.debug.print("Error parsing arguments!\n", .{});
 
     std.debug.print("\n\nArguments after parsing\n", .{});
     parser.printInfo();

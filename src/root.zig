@@ -113,4 +113,12 @@ pub const ArgumentParser = struct {
             return Errors.ParserError.CouldNotBeParsed;
         }
     }
+
+    pub fn parse(self: *ArgumentParser) !void {
+        var arg_iterator = try std.process.argsWithAllocator(self.allocator);
+        defer arg_iterator.deinit();
+        _ = arg_iterator.next();
+
+        return self.parseFromArgIterator(&arg_iterator);
+    }
 };

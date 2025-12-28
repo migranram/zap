@@ -2,12 +2,6 @@ const std = @import("std");
 
 const zlip = @import("zlip");
 
-fn t(names: []const []const u8) void {
-    for (names) |name| {
-        std.debug.print("{s}\n", .{name});
-    }
-}
-
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -15,14 +9,15 @@ pub fn main() !void {
     const allocator = arena.allocator();
     var arg_iterator = try std.process.argsWithAllocator(allocator);
     defer arg_iterator.deinit();
+    _ = arg_iterator.next();
 
     var parser: zlip.ArgumentParser = try zlip.ArgumentParser.init(allocator, "parser");
     defer parser.deinit();
-    _ = parser.addArgument("test", bool, null, null);
     _ = parser.addArgument("integer", i32, 125, null);
-    _ = parser.addArgument("float", f64, 125.23, null);
-    _ = parser.addArgument("string", []const u8, "hello arg", null);
-    parser.parseFromArgIterator(&arg_iterator);
+    _ = parser.addArgument("test", bool, null, zlip.ArgumentOptions{ .role = .Flag });
+    _ = parser.addArgument("float", f64, 125.23, zlip.ArgumentOptions{ .role = .Optional });
+    _ = parser.addArgument("string", []const u8, "hello arg", zlip.ArgumentOptions{ .role = .Optional });
+    parser.parseFromArgIterator(&arg_iterator) catch std.debug.print("Error parsing arguments!\n", .{});
 
-    t(&.{ "test", "-t" });
+    parser.printInfo();
 }

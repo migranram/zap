@@ -86,7 +86,7 @@ pub const ArgumentParser = struct {
         var ix: usize = 0;
         outerloop: while (arg_iterator.next()) |token| : (ix += 1) {
             for (self.positional_arguments.items) |*arg| {
-                const res: ParsingResult = try arg.*.parseString(token, ArgumentRole.Positional);
+                const res: ParsingResult = try arg.parseString(token, ArgumentRole.Positional);
 
                 if (res == .NotParsed) {
                     std.debug.print("Positional argument not found: {s}\n", .{arg.*.getName()});
@@ -113,7 +113,10 @@ pub const ArgumentParser = struct {
                 if (next_token) |t| {
                     try arg.parseValueFromString(t);
                     continue :outerloop;
-                } else return Errors.ParserError.CouldNotBeParsed;
+                } else {
+                    std.debug.print("Missing value for optional: {s}\n", .{arg.*.getName()});
+                    return Errors.ParserError.CouldNotBeParsed;
+                }
             }
 
             std.debug.print("Unknown argument: {s}\n", .{token});

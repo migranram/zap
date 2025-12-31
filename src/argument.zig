@@ -30,28 +30,28 @@ pub const Argument = union(enum) {
 
     pub fn getName(self: *const Argument) []const u8 {
         return switch (self.*) {
-            .Bool => self.*.Bool.name,
-            .Int => self.*.Int.name,
-            .Float => self.*.Float.name,
-            .String => self.*.String.name,
+            .Bool => self.Bool.name,
+            .Int => self.Int.name,
+            .Float => self.Float.name,
+            .String => self.String.name,
         };
     }
 
     pub fn setParsed(self: *Argument) void {
         switch (self.*) {
-            .Bool => self.*.Bool.parsed = true,
-            .Int => self.*.Int.parsed = true,
-            .Float => self.*.Float.parsed = true,
-            .String => self.*.String.parsed = true,
+            .Bool => self.Bool.parsed = true,
+            .Int => self.Int.parsed = true,
+            .Float => self.Float.parsed = true,
+            .String => self.String.parsed = true,
         }
     }
 
     pub fn parsed(self: *const Argument) bool {
         return switch (self.*) {
-            .Bool => self.*.Bool.parsed,
-            .Int => self.*.Int.parsed,
-            .Float => self.*.Float.parsed,
-            .String => self.*.String.parsed,
+            .Bool => self.Bool.parsed,
+            .Int => self.Int.parsed,
+            .Float => self.Float.parsed,
+            .String => self.String.parsed,
         };
     }
 

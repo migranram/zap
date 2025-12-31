@@ -37,5 +37,3 @@ zig build
 
 Internally, floats and integers are casted to _f64_ and _i64_ respectively.
 
-
-This small project was developed for learning purposes, many features of a full argument parser are missing, but it is enough for most simple use-cases.

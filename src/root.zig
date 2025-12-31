@@ -86,7 +86,10 @@ pub const ArgumentParser = struct {
         var ix: usize = 0;
         outerloop: while (arg_iterator.next()) |token| : (ix += 1) {
             for (self.positional_arguments.items) |*arg| {
-                const res: ParsingResult = try arg.parseString(token, ArgumentRole.Positional);
+                const res: ParsingResult = arg.parseString(token, ArgumentRole.Positional) catch |e| {
+                    if(e == Errors.ParserError.InvalidRawType)
+                        std.debug.print("Error parsing value \"{s}\" for positional [{s}]\n",.{token, arg.getName()});
+                    return e;};
 
                 if (res == .NotParsed) {
                     std.debug.print("Positional argument not found: {s}\n", .{arg.*.getName()});
@@ -111,7 +114,14 @@ pub const ArgumentParser = struct {
                 const next_token = arg_iterator.next();
 
                 if (next_token) |t| {
-                    try arg.parseValueFromString(t);
+                    if (std.mem.eql(u8, t[0..2], "--")) {
+                        std.debug.print("Trying to parse \"{s}\" as value for optional [{s}] failed!\n", .{ t, arg.getName() });
+                        return Errors.ParserError.CouldNotBeParsed;
+                    }
+                    arg.parseValueFromString(t) catch {
+                        std.debug.print("Error parsing value \"{s}\" for optional [{s}]\n", .{ t, arg.getName() });
+                        return Errors.ParserError.InvalidRawType;
+                    };
                     continue :outerloop;
                 } else {
                     std.debug.print("Missing value for optional: {s}\n", .{arg.*.getName()});

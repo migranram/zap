@@ -81,15 +81,16 @@ pub const ArgumentParser = struct {
         }
     }
 
-    pub fn parseFromArgIterator(self: *ArgumentParser, arg_iterator: *std.process.ArgIterator) Errors.ParserError!void {
+    pub fn parseFromArgIterator(self: *ArgumentParser, arg_iterator: *std.process.ArgIterator, continue_on_unknown: bool) Errors.ParserError!void {
         // First parse the positionals, they have to be in the same order as defined:
         var ix: usize = 0;
         outerloop: while (arg_iterator.next()) |token| : (ix += 1) {
             for (self.positional_arguments.items) |*arg| {
                 const res: ParsingResult = arg.parseString(token, ArgumentRole.Positional) catch |e| {
-                    if(e == Errors.ParserError.InvalidRawType)
-                        std.debug.print("Error parsing value \"{s}\" for positional [{s}]\n",.{token, arg.getName()});
-                    return e;};
+                    if (e == Errors.ParserError.InvalidRawType)
+                        std.debug.print("Error parsing value \"{s}\" for positional [{s}]\n", .{ token, arg.getName() });
+                    return e;
+                };
 
                 if (res == .NotParsed) {
                     std.debug.print("Positional argument not found: {s}\n", .{arg.*.getName()});
@@ -98,6 +99,8 @@ pub const ArgumentParser = struct {
 
                 if (res == .Parsed)
                     continue :outerloop;
+
+                // If already parsed go to next arg
             }
             for (self.flag_arguments.items) |*arg| {
                 const res: ParsingResult = try arg.parseString(token, ArgumentRole.Flag);
@@ -114,10 +117,19 @@ pub const ArgumentParser = struct {
                 const next_token = arg_iterator.next();
 
                 if (next_token) |t| {
-                    if (std.mem.eql(u8, t[0..2], "--")) {
-                        std.debug.print("Trying to parse \"{s}\" as value for optional [{s}] failed!\n", .{ t, arg.getName() });
-                        return Errors.ParserError.CouldNotBeParsed;
+                    for (self.optional_arguments.items) |*other| {
+                        if (other.matches(t, .Optional)) {
+                            std.debug.print("Trying to parse \"{s}\" as value for optional [{s}] failed!\n", .{ t, arg.getName() });
+                            return Errors.ParserError.CouldNotBeParsed;
+                        }
                     }
+                    for (self.flag_arguments.items) |*other| {
+                        if (other.matches(t, .Flag)) {
+                            std.debug.print("Trying to parse \"{s}\" as value for optional [{s}] failed!\n", .{ t, arg.getName() });
+                            return Errors.ParserError.CouldNotBeParsed;
+                        }
+                    }
+
                     arg.parseValueFromString(t) catch {
                         std.debug.print("Error parsing value \"{s}\" for optional [{s}]\n", .{ t, arg.getName() });
                         return Errors.ParserError.InvalidRawType;
@@ -130,7 +142,8 @@ pub const ArgumentParser = struct {
             }
 
             std.debug.print("Unknown argument: {s}\n", .{token});
-            return Errors.ParserError.CouldNotBeParsed;
+            if (!continue_on_unknown)
+                return Errors.ParserError.CouldNotBeParsed;
         }
     }
 
@@ -140,6 +153,6 @@ pub const ArgumentParser = struct {
         defer arg_iterator.deinit();
         _ = arg_iterator.next();
 
-        return self.parseFromArgIterator(&arg_iterator);
+        return self.parseFromArgIterator(&arg_iterator, false);
     }
 };

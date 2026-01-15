@@ -51,6 +51,31 @@ pub const ArgumentParser = struct {
         return true;
     }
 
+    pub fn addArgumentsFromStruct(self: *ArgumentParser, arg_struct: type, options: ?ArgumentOptions) bool {
+        const ti = @typeInfo(arg_struct);
+        if (ti != .@"struct") {
+            std.debug.print("Error parsing argument structs \"{s}\". The passed type has to be a struct!\n", .{@typeName(arg_struct)});
+            return false;
+        }
+
+        inline for (ti.@"struct".fields) |field| {
+            std.debug.print("Adding argument {s} of type [{s}] and with default value: ", .{ field.name, @typeName(field.type) });
+            if (field.defaultValue()) |val| {
+                std.debug.print("{any}", .{val});
+            } else {
+                std.debug.print("null", .{});
+            }
+            std.debug.print("\n", .{});
+
+            if(!self.addArgument(field.name, field.type, field.defaultValue(), options))
+            {
+                std.debug.print("Could not add argument \"{s}\". In argument struct [{s}]\n", .{field.name,@typeName(arg_struct)});
+            }
+        }
+
+        return true;
+    }
+
     pub fn printInfo(self: *ArgumentParser) void {
         std.debug.print("{s:-^30}\n", .{self.name});
         var j: usize = 0;

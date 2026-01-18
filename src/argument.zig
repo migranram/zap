@@ -12,6 +12,7 @@ const IntArg = BaseArg(i64);
 const FloatArg = BaseArg(f64);
 const StringArg = BaseArg([]const u8);
 
+// Already parsed only use by positional arguments
 pub const ParsingResult = enum { Parsed, NotParsed, AlreadyParsed };
 
 pub const Argument = union(enum) {
@@ -55,6 +56,13 @@ pub const Argument = union(enum) {
         };
     }
 
+    pub fn matches(self: *const Argument, text: []const u8, role: ArgumentRole) bool {
+        return switch (role) {
+            .Positional => true,
+            else => std.mem.eql(u8, text[2..], self.getName()),
+        };
+    }
+
     pub fn setValue(self: *Argument, value: anytype) !void {
         const T = @TypeOf(value);
         if (typing_utils.isInteger(T)) {
@@ -71,8 +79,7 @@ pub const Argument = union(enum) {
     fn parseFlag(self: *Argument, text: []const u8) errors.ParserError!ParsingResult {
         if (text.len < 3)
             return ParsingResult.NotParsed;
-        const fmt_name = self.getName();
-        if (std.mem.eql(u8, text[2..], fmt_name)) {
+        if (self.matches(text, .Flag)) {
             try self.setValue(true);
             return ParsingResult.Parsed;
         }
@@ -84,8 +91,7 @@ pub const Argument = union(enum) {
         if (text.len < 3)
             return ParsingResult.NotParsed;
 
-        const fmt_name = self.getName();
-        if (!std.mem.eql(u8, text[2..], fmt_name)) {
+        if (!self.matches(text, .Optional)) {
             return ParsingResult.NotParsed;
         }
 
@@ -119,7 +125,7 @@ pub const Argument = union(enum) {
     }
 
     pub fn parseString(self: *Argument, text: []const u8, role: ArgumentRole) errors.ParserError!ParsingResult {
-        if (self.parsed())
+        if (role == .Positional and self.parsed())
             return ParsingResult.AlreadyParsed;
 
         const ret = switch (role) {
@@ -128,8 +134,9 @@ pub const Argument = union(enum) {
             .Optional => self.parseOptional(text),
         } catch |err| return err;
 
-        if (ret == ParsingResult.Parsed)
+        if (ret == ParsingResult.Parsed) {
             self.setParsed();
+        }
 
         return ret;
     }

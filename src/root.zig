@@ -60,12 +60,12 @@ pub const ArgumentParser = struct {
 
         inline for (ti.@"struct".fields) |field| {
             // std.debug.print("Adding argument {s} of type [{s}] and with default value: ", .{ field.name, @typeName(field.type) });
-            if (field.defaultValue()) |val| {
-                std.debug.print("{any}", .{val});
-            } else {
-                std.debug.print("null", .{});
-            }
-            std.debug.print("\n", .{});
+            // if (field.defaultValue()) |val| {
+            //     std.debug.print("{any}", .{val});
+            // } else {
+            //     std.debug.print("null", .{});
+            // }
+            // std.debug.print("\n", .{});
 
             if(!self.addArgument(field.name, field.type, field.defaultValue(), options))
             {

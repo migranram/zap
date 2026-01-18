@@ -67,9 +67,8 @@ pub const ArgumentParser = struct {
             // }
             // std.debug.print("\n", .{});
 
-            if(!self.addArgument(field.name, field.type, field.defaultValue(), options))
-            {
-                std.debug.print("Could not add argument \"{s}\". In argument struct [{s}]\n", .{field.name,@typeName(arg_struct)});
+            if (!self.addArgument(field.name, field.type, field.defaultValue(), options)) {
+                std.debug.print("Could not add argument \"{s}\". In argument struct [{s}]\n", .{ field.name, @typeName(arg_struct) });
             }
         }
 

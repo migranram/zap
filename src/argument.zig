@@ -146,3 +146,34 @@ pub const ArgumentRole = enum { Positional, Flag, Optional };
 pub const ArgumentOptions = struct {
     role: ArgumentRole,
 };
+
+test "int args" {
+    var arg: Argument = try Argument.createFromType("example_arg", i32, 35);
+
+    try std.testing.expect(arg.parsed() == false);
+    try std.testing.expect(arg == .Int);
+    try std.testing.expect(arg.Int.value == 35);
+
+    try std.testing.expect(arg.matches("--example_arg",ArgumentRole.Optional));
+    try std.testing.expect(!arg.matches("--no_example_arg",ArgumentRole.Optional));
+
+    try arg.setValue(25);
+
+    try std.testing.expect(arg.Int.value == 25);
+    try std.testing.expect(arg.parsed() == false);
+}
+
+test "flag args" {
+    var arg: Argument = try Argument.createFromType("example_arg", bool, null);
+
+    try std.testing.expect(arg.parsed() == false);
+    try std.testing.expect(arg == .Bool);
+
+    try std.testing.expect(arg.matches("--example_arg",ArgumentRole.Optional));
+    try std.testing.expect(!arg.matches("--no_example_arg",ArgumentRole.Optional));
+
+    _ =  try arg.parseString("--example_arg", ArgumentRole.Flag);
+
+    try std.testing.expect(arg.Bool.value == true);
+    try std.testing.expect(arg.parsed() == true);
+}

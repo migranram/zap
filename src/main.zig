@@ -6,7 +6,8 @@ const zap = @import("zap");
 const myOptionalArgs = struct {
     optional1: f32,
     int_param_name: i32 = 35,
-    just_another_param: bool
+    just_another_param: bool,
+    nested_struct: struct {}
 };
 
 const notValidArgsType = enum {hello, world};

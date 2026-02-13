@@ -1,1 +1,1 @@
-pub const ParserError = error{ InvalidRawType, CouldNotBeParsed };
+pub const ParserError = error{ InvalidRawType, CouldNotBeParsed, CannotAddArgument };

@@ -13,18 +13,25 @@ pub const ArgumentParser = struct {
     name: []const u8,
     allocator: std.mem.Allocator,
 
+    // Sub commands
+    subcommands_ptr_list: std.ArrayList(ArgumentParser),
+    selected_sub_cmd: ?u16,
+
     // Arguments
     flag_arguments: std.ArrayList(Argument),
     positional_arguments: std.ArrayList(Argument),
     optional_arguments: std.ArrayList(Argument),
 
+    // Init / De-init ----------------
     pub fn init(allocator: std.mem.Allocator, name: []const u8) !ArgumentParser {
         return ArgumentParser{
-            .flag_arguments = try std.ArrayList(Argument).initCapacity(allocator, 10),
-            .positional_arguments = try std.ArrayList(Argument).initCapacity(allocator, 10),
-            .optional_arguments = try std.ArrayList(Argument).initCapacity(allocator, 10),
+            .flag_arguments = .empty,
+            .positional_arguments = .empty,
+            .optional_arguments = .empty,
             .name = name,
             .allocator = allocator,
+            .subcommands_ptr_list = .empty,
+            .selected_sub_cmd = null,
         };
     }
 
@@ -32,83 +39,83 @@ pub const ArgumentParser = struct {
         self.flag_arguments.deinit(self.allocator);
         self.positional_arguments.deinit(self.allocator);
         self.optional_arguments.deinit(self.allocator);
+
+        for (self.subcommands_ptr_list.items) |*cmd| {
+            cmd.deinit();
+        }
+        self.subcommands_ptr_list.deinit(self.allocator);
     }
 
-    pub fn addArgument(self: *ArgumentParser, name: []const u8, T: type, defaultValue: ?T, options: ?ArgumentOptions) bool {
+    // Subcommands ----------------
+    pub fn addCommand(self: *ArgumentParser, name: []const u8) !*ArgumentParser {
+        const cmd = try self.subcommands_ptr_list.addOne(self.allocator);
+
+        errdefer _ = self.subcommands_ptr_list.pop();
+        cmd.* = try ArgumentParser.init(self.allocator, name);
+        return cmd;
+    }
+
+    // Argument handling ----------------
+    pub fn addArgument(self: *ArgumentParser, name: []const u8, T: type, defaultValue: ?T, options: ?ArgumentOptions) !void {
+        // Check if there are sub-commands. Currently a parser with subcmds cannot have global arguments
+        if (self.subcommands_ptr_list.items.len > 0)
+            return Errors.ParserError.CannotAddArgument;
+
         const arg_type = if (options) |opt| opt.role else ArgumentRole.Positional;
 
         if (arg_type == .Flag and T != bool)
-            return false;
+            return Errors.ParserError.InvalidRawType;
 
-        const arg = Argument.createFromType(name, T, defaultValue) catch return false;
+        const arg = try Argument.createFromType(name, T, defaultValue);
 
         switch (arg_type) {
-            ArgumentRole.Flag => self.flag_arguments.append(self.allocator, arg) catch return false,
-            ArgumentRole.Positional => self.positional_arguments.append(self.allocator, arg) catch return false,
-            ArgumentRole.Optional => self.optional_arguments.append(self.allocator, arg) catch return false,
+            ArgumentRole.Flag => {
+                try self.flag_arguments.append(self.allocator, arg);
+            },
+            ArgumentRole.Positional => {
+                try self.positional_arguments.append(self.allocator, arg);
+            },
+            ArgumentRole.Optional => {
+                try self.optional_arguments.append(self.allocator, arg);
+            },
         }
 
-        return true;
+        return;
     }
 
-    pub fn addArgumentsFromStruct(self: *ArgumentParser, arg_struct: type, options: ?ArgumentOptions) bool {
+    pub fn addArgumentsFromStruct(self: *ArgumentParser, arg_struct: type, options: ?ArgumentOptions) !void {
         const ti = @typeInfo(arg_struct);
         if (ti != .@"struct") {
             std.debug.print("Error parsing argument structs \"{s}\". The passed type has to be a struct!\n", .{@typeName(arg_struct)});
-            return false;
+            return Errors.ParserError.InvalidRawType;
         }
 
         inline for (ti.@"struct".fields) |field| {
-            // std.debug.print("Adding argument {s} of type [{s}] and with default value: ", .{ field.name, @typeName(field.type) });
-            // if (field.defaultValue()) |val| {
-            //     std.debug.print("{any}", .{val});
-            // } else {
-            //     std.debug.print("null", .{});
-            // }
-            // std.debug.print("\n", .{});
-
-            if (!self.addArgument(field.name, field.type, field.defaultValue(), options)) {
-                std.debug.print("Could not add argument \"{s}\". In argument struct [{s}]\n", .{ field.name, @typeName(arg_struct) });
-            }
+            self.addArgument(field.name, field.type, field.defaultValue(), options) catch |e| {
+                std.debug.print("Could not add argument \"{s}\". In argument struct [{s}]. {any}\n", .{ field.name, @typeName(arg_struct), e });
+            };
         }
 
-        return true;
-    }
-
-    pub fn printInfo(self: *ArgumentParser) void {
-        std.debug.print("{s:-^30}\n", .{self.name});
-        var j: usize = 0;
-        for (self.positional_arguments.items) |arg| {
-            switch (arg) {
-                .Bool => std.debug.print("({d})|.POS|[{s:.^14}] {s:<20}: {s}\n", .{ j, "Bool", arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
-                .Int => std.debug.print("({d})|.POS|[{s:.^14}] {s:<20}: {d}\n", .{ j, "Int", arg.Int.name, arg.Int.value }),
-                .Float => std.debug.print("({d})|.POS|[{s:.^14}] {s:<20}: {d}\n", .{ j, "Float", arg.Float.name, arg.Float.value }),
-                .String => std.debug.print("({d})|.POS|[{s:.^14}] {s:<20}: {s}\n", .{ j, "String", arg.String.name, arg.String.value }),
-            }
-            j += 1;
-        }
-        for (self.flag_arguments.items) |arg| {
-            switch (arg) {
-                .Bool => std.debug.print("({d})|FLAG|[{s:.^14}] {s:<20}: {s}\n", .{ j, "Bool", arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
-                else => @panic("Flag should only be bool"),
-            }
-            j += 1;
-        }
-        for (self.optional_arguments.items) |arg| {
-            switch (arg) {
-                .Bool => std.debug.print("({d})|.OPT|[{s:.^14}] {s:<20}: {s}\n", .{ j, "Bool", arg.Bool.name, if (arg.Bool.value) "true" else "false" }),
-                .Int => std.debug.print("({d})|.OPT|[{s:.^14}] {s:<20}: {d}\n", .{ j, "Int", arg.Int.name, arg.Int.value }),
-                .Float => std.debug.print("({d})|.OPT|[{s:.^14}] {s:<20}: {d}\n", .{ j, "Float", arg.Float.name, arg.Float.value }),
-                .String => std.debug.print("({d})|.OPT|[{s:.^14}] {s:<20}: {s}\n", .{ j, "String", arg.String.name, arg.String.value }),
-            }
-            j += 1;
-        }
+        return;
     }
 
     pub fn parseFromArgIterator(self: *ArgumentParser, arg_iterator: *std.process.ArgIterator, continue_on_unknown: bool) Errors.ParserError!void {
         // First parse the positionals, they have to be in the same order as defined:
         var ix: usize = 0;
         outerloop: while (arg_iterator.next()) |token| : (ix += 1) {
+            if (self.subcommands_ptr_list.items.len > 0) {
+                for (self.subcommands_ptr_list.items, 0..) |*cmd, id| {
+                    if (!std.mem.eql(u8, cmd.name, token))
+                        continue;
+
+                    self.selected_sub_cmd = @intCast(id);
+                    try cmd.parseFromArgIterator(arg_iterator, continue_on_unknown);
+                    break :outerloop;
+                }
+                std.debug.print("No sub command could be parsed! Available are:\n", .{});
+                for (self.subcommands_ptr_list.items, 0..) |cmd, id| std.debug.print("\t--> [{d}] {s}\n", .{ id, cmd.name });
+                return Errors.ParserError.CouldNotBeParsed;
+            }
             for (self.positional_arguments.items) |*arg| {
                 const res: ParsingResult = arg.parseString(token, ArgumentRole.Positional) catch |e| {
                     if (e == Errors.ParserError.InvalidRawType)
@@ -178,5 +185,104 @@ pub const ArgumentParser = struct {
         _ = arg_iterator.next();
 
         return self.parseFromArgIterator(&arg_iterator, false);
+    }
+
+    fn findArgument(self: *const ArgumentParser, name: []const u8) ?Argument {
+        for (self.positional_arguments.items) |arg| if (std.mem.eql(u8, name, arg.getName())) return arg;
+        for (self.flag_arguments.items) |arg| if (std.mem.eql(u8, name, arg.getName())) return arg;
+        for (self.optional_arguments.items) |arg| if (std.mem.eql(u8, name, arg.getName())) return arg;
+
+        return null;
+    }
+
+    pub fn getIntArgument(self: *const ArgumentParser, name: []const u8) ?i64 {
+        if (self.subcommands_ptr_list.items.len > 0) {
+            if (self.selected_sub_cmd == null) {
+                return null;
+            } else {
+                return self.subcommands_ptr_list.items[self.selected_sub_cmd.?].getIntArgument(name);
+            }
+        }
+        if (self.findArgument(name)) |arg| return arg.get(i64);
+
+        return null;
+    }
+
+    pub fn getFloatArgument(self: *const ArgumentParser, name: []const u8) ?f64 {
+        if (self.subcommands_ptr_list.items.len > 0) {
+            if (self.selected_sub_cmd == null) {
+                return null;
+            } else {
+                return self.subcommands_ptr_list.items[self.selected_sub_cmd.?].getFloatArgument(name);
+            }
+        }
+        if (self.findArgument(name)) |arg| return arg.get(f64);
+
+        return null;
+    }
+
+    pub fn getStringArgument(self: *const ArgumentParser, name: []const u8) ?[]const u8 {
+        if (self.subcommands_ptr_list.items.len > 0) {
+            if (self.selected_sub_cmd == null) {
+                return null;
+            } else {
+                return self.subcommands_ptr_list.items[self.selected_sub_cmd.?].getStringArgument(name);
+            }
+        }
+        if (self.findArgument(name)) |arg| return arg.get([]const u8);
+
+        return null;
+    }
+
+    pub fn getBoolArgument(self: *const ArgumentParser, name: []const u8) ?bool {
+        if (self.subcommands_ptr_list.items.len > 0) {
+            if (self.selected_sub_cmd == null) {
+                return null;
+            } else {
+                return self.subcommands_ptr_list.items[self.selected_sub_cmd.?].getBoolArgument(name);
+            }
+        }
+        if (self.findArgument(name)) |arg| return arg.get(bool);
+
+        return null;
+    }
+
+
+    // Utils ----------------
+    pub fn printInfo(self: *const ArgumentParser) void {
+        std.debug.print("{s:-^30}\n", .{self.name});
+        if (self.subcommands_ptr_list.items.len > 0) {
+            if (self.selected_sub_cmd == null) {
+                for (self.subcommands_ptr_list.items) |cmd| cmd.printInfo();
+            } else self.subcommands_ptr_list.items[self.selected_sub_cmd.?].printInfo();
+            return;
+        }
+        var j: usize = 0;
+        var buffer: [100]u8 = undefined;
+        for (self.positional_arguments.items) |arg| {
+            switch (arg) {
+                .Bool => std.debug.print("({d})|.POS|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+                .Int => std.debug.print("({d})|.POS|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+                .Float => std.debug.print("({d})|.POS|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+                .String => std.debug.print("({d})|.POS|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+            }
+            j += 1;
+        }
+        for (self.flag_arguments.items) |arg| {
+            switch (arg) {
+                .Bool => std.debug.print("({d})|FLAG|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+                else => @panic("Flag should only be bool"),
+            }
+            j += 1;
+        }
+        for (self.optional_arguments.items) |arg| {
+            switch (arg) {
+                .Bool => std.debug.print("({d})|.OPT|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+                .Int => std.debug.print("({d})|.OPT|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+                .Float => std.debug.print("({d})|.OPT|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+                .String => std.debug.print("({d})|.OPT|{s}\n", .{ j, arg.getFormattedString(&buffer) }),
+            }
+            j += 1;
+        }
     }
 };

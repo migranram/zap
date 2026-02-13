@@ -140,7 +140,23 @@ pub const Argument = union(enum) {
 
         return ret;
     }
-};
+
+    pub fn getFormattedString(self: *const Argument, buffer: []u8) []u8 {
+        return switch (self.*) {
+            .Bool => std.fmt.bufPrint(buffer, "[{s:.^14}] {s:<20} [{s}] {s}", .{ "Boolean", self.Bool.name, if (self.parsed()) "x" else " ", if (self.Bool.value) "true" else "false" }),
+            .Int => std.fmt.bufPrint(buffer, "[{s:.^14}] {s:<20} [{s}] {d}", .{ "Int", self.Int.name, if (self.parsed()) "x" else " ", self.Int.value }),
+            .Float => std.fmt.bufPrint(buffer, "[{s:.^14}] {s:<20} [{s}] {d:.3}", .{ "Float", self.Float.name, if (self.parsed()) "x" else " ", self.Float.value }),
+            .String => std.fmt.bufPrint(buffer, "[{s:.^14}] {s:<20} [{s}] {s}", .{ "String", self.String.name, if (self.parsed()) "x" else " ", self.String.value }),
+        } catch return "";
+    }
+
+    pub fn get(self: *const Argument, T: type) T {
+        if (T == bool) return self.Bool.value;
+        if (typing_utils.isFloat(T)) return self.Float.value;
+        if (typing_utils.isInteger(T)) return self.Int.value;
+        if (T == []const u8) return self.String.value;
+    }
+    };
 
 pub const ArgumentRole = enum { Positional, Flag, Optional };
 pub const ArgumentOptions = struct {
@@ -154,8 +170,8 @@ test "int args" {
     try std.testing.expect(arg == .Int);
     try std.testing.expect(arg.Int.value == 35);
 
-    try std.testing.expect(arg.matches("--example_arg",ArgumentRole.Optional));
-    try std.testing.expect(!arg.matches("--no_example_arg",ArgumentRole.Optional));
+    try std.testing.expect(arg.matches("--example_arg", ArgumentRole.Optional));
+    try std.testing.expect(!arg.matches("--no_example_arg", ArgumentRole.Optional));
 
     try arg.setValue(25);
 
@@ -169,10 +185,10 @@ test "flag args" {
     try std.testing.expect(arg.parsed() == false);
     try std.testing.expect(arg == .Bool);
 
-    try std.testing.expect(arg.matches("--example_arg",ArgumentRole.Optional));
-    try std.testing.expect(!arg.matches("--no_example_arg",ArgumentRole.Optional));
+    try std.testing.expect(arg.matches("--example_arg", ArgumentRole.Optional));
+    try std.testing.expect(!arg.matches("--no_example_arg", ArgumentRole.Optional));
 
-    _ =  try arg.parseString("--example_arg", ArgumentRole.Flag);
+    _ = try arg.parseString("--example_arg", ArgumentRole.Flag);
 
     try std.testing.expect(arg.Bool.value == true);
     try std.testing.expect(arg.parsed() == true);
